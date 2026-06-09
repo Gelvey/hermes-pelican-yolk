@@ -7,13 +7,13 @@
   "exported_at": "2024-06-09T12:00:00+00:00",
   "name": "Hermes Agent",
   "author": "gelvey@neuronexus.xyz",
-  "description": "Hermes AI Agent platform by Nous Research. Deploys the OpenAI-compatible gateway API and built-in web dashboard in a single container using s6-overlay.",
+  "description": "Hermes AI Agent platform by Nous Research. Deploys the OpenAI-compatible gateway API and built-in web dashboard in a single container using s6-overlay. The terminal backend is locked to 'local' — no Docker-in-Docker commands are run.",
   "features": null,
   "docker_images": {
     "Hermes Latest (Custom Yolk)": "ghcr.io/gelvey/hermes-pelican:latest"
   },
   "file_denylist": [],
-  "startup": "if [ ! -L /opt/data ]; then rm -rf /opt/data 2>/dev/null || true && ln -s /home/container /opt/data 2>/dev/null || true; fi && hermes gateway run",
+  "startup": "hermes gateway run",
   "config": {
     "files": "{}",
     "startup": "{\"done\": [\"Gateway listening\", \"Dashboard listening\"]}",
@@ -22,7 +22,7 @@
   },
   "scripts": {
     "installation": {
-      "script": "#!/bin/bash\n# Hermes Agent Installation Script\n# Runs in /mnt/server (maps to /home/container at runtime)\n\ncd /mnt/server\n\n# Generate a secure API key\nAPI_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)\n\n# Create initial .env if it doesn't exist\nif [ ! -f /mnt/server/.env ]; then\n  cat > /mnt/server/.env <<EOF\n# Hermes Environment Configuration\nAPI_SERVER_ENABLED=true\nAPI_SERVER_HOST=0.0.0.0\nAPI_SERVER_KEY=${API_KEY}\nEOF\n  echo \"Created initial .env with a generated API key.\"\nfi\n\n# Create a basic config.yaml if it doesn't exist\nif [ ! -f /mnt/server/config.yaml ]; then\n  cat > /mnt/server/config.yaml <<EOF\n# Hermes Configuration\n# Run 'hermes setup' via the console for interactive configuration.\nEOF\n  echo \"Created initial config.yaml.\"\nfi\n\necho \"Installation complete.\"\necho \"IMPORTANT: Configure your API keys and settings in the .env file.\"\necho \"You can also run 'hermes setup' via the console for interactive setup.\"\nexit 0",
+      "script": "#!/bin/bash\n# Hermes Agent Installation Script\n# Runs in /mnt/server (maps to /home/container at runtime)\n# No Docker commands are run inside the container — this is a Pelican-native deployment.\n\nset -e\n\ncd /mnt/server\n\n# ── Generate a secure API key ──\nAPI_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)\n\n# ── Create initial .env if it doesn't exist ──\nif [ ! -f /mnt/server/.env ]; then\n  cat > /mnt/server/.env <<EOF\n# Hermes Environment Configuration\nAPI_SERVER_ENABLED=true\nAPI_SERVER_HOST=0.0.0.0\nAPI_SERVER_KEY=${API_KEY}\n# Terminal backend is configured in config.yaml (terminal.backend: local).\n# Do NOT set terminal.backend to \"docker\" — there is no Docker daemon inside this container.\nEOF\n  echo \"Created initial .env with a generated API key.\"\nfi\n\n# ── Create config.yaml with safe defaults ──\nif [ ! -f /mnt/server/config.yaml ]; then\n  cat > /mnt/server/config.yaml <<'YAMLEOF'\n# Hermes Configuration\n# Run 'hermes setup' via the console for interactive configuration.\n#\n# IMPORTANT: This is a Pelican Panel deployment.\n# The terminal backend is set to \"local\" — commands run directly in the container.\n# Do NOT change terminal.backend to \"docker\" — there is no Docker daemon inside this container.\n\nterminal:\n  backend: local\nYAMLEOF\n  echo \"Created initial config.yaml with terminal.backend=local.\"\nfi\n\necho \"Installation complete.\"\necho \"IMPORTANT: Configure your API keys and settings in the .env file.\"\necho \"You can also run 'hermes setup' via the console for interactive setup.\"\necho \"Terminal backend is locked to 'local' — no Docker-in-Docker is used.\"\nexit 0",
       "container": "nousresearch/hermes-agent:latest",
       "entrypoint": "bash"
     }
@@ -76,6 +76,16 @@
       "user_viewable": true,
       "user_editable": false,
       "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Terminal Backend",
+      "description": "Informational: the authoritative setting is 'terminal.backend: local' in config.yaml (set by the install script). This variable is a visible reminder; the config.yaml is what Hermes actually reads. MUST remain 'local'.",
+      "env_variable": "HERMES_TERMINAL_BACKEND",
+      "default_value": "local",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|string|in:local",
       "field_type": "text"
     },
     {

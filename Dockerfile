@@ -15,13 +15,14 @@ LABEL org.opencontainers.image.authors="gelvey@neuronexus.xyz" \
 USER root
 RUN rm -rf /opt/data && ln -s /home/container /opt/data
 
-# Create the required Pelican container user (harmless if it already exists)
-RUN useradd -m -d /home/container -s /bin/bash container || true
+# Create the required Pelican container user with UID 999 (harmless if it already exists)
+RUN groupadd -g 999 container 2>/dev/null || true && \
+    useradd -u 999 -g 999 -m -d /home/container -s /bin/bash container 2>/dev/null || true
 
 # Fix s6-overlay permissions error when running as non-root user.
 # Pelican runs containers as the 'container' user, so s6-overlay preinit expects
 # /run to be owned by that user, not root.
-RUN chown -R container:container /run /var/run /tmp
+RUN chown -R 999:999 /run /var/run /tmp && chmod 777 /run /var/run /tmp
 
 # Tell s6-overlay to accept a root-owned /run directory when running as non-root.
 # This is a safety net for Pelican/Pterodactyl environments where the runtime user

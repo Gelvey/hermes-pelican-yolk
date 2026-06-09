@@ -1,0 +1,102 @@
+{
+  "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2024-06-09T12:00:00+00:00",
+  "name": "Hermes Agent",
+  "author": "gelvey@neuronexus.xyz",
+  "description": "Hermes AI Agent platform by Nous Research. Deploys the OpenAI-compatible gateway API and built-in web dashboard in a single container using s6-overlay.",
+  "features": null,
+  "docker_images": {
+    "Hermes Latest (Custom Yolk)": "ghcr.io/gelvey/hermes-pelican:latest"
+  },
+  "file_denylist": [],
+  "startup": "if [ ! -L /opt/data ]; then rm -rf /opt/data 2>/dev/null || true && ln -s /home/container /opt/data 2>/dev/null || true; fi && hermes gateway run",
+  "config": {
+    "files": "{}",
+    "startup": "{\"done\": [\"Gateway listening\", \"Dashboard listening\"]}",
+    "logs": "{}",
+    "stop": "^SIGTERM"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\n# Hermes Agent Installation Script\n# Runs in /mnt/server (maps to /home/container at runtime)\n\ncd /mnt/server\n\n# Generate a secure API key\nAPI_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)\n\n# Create initial .env if it doesn't exist\nif [ ! -f /mnt/server/.env ]; then\n  cat > /mnt/server/.env <<EOF\n# Hermes Environment Configuration\nAPI_SERVER_ENABLED=true\nAPI_SERVER_HOST=0.0.0.0\nAPI_SERVER_KEY=${API_KEY}\nEOF\n  echo \"Created initial .env with a generated API key.\"\nfi\n\n# Create a basic config.yaml if it doesn't exist\nif [ ! -f /mnt/server/config.yaml ]; then\n  cat > /mnt/server/config.yaml <<EOF\n# Hermes Configuration\n# Run 'hermes setup' via the console for interactive configuration.\nEOF\n  echo \"Created initial config.yaml.\"\nfi\n\necho \"Installation complete.\"\necho \"IMPORTANT: Configure your API keys and settings in the .env file.\"\necho \"You can also run 'hermes setup' via the console for interactive setup.\"\nexit 0",
+      "container": "nousresearch/hermes-agent:latest",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Enable Dashboard",
+      "description": "Enable the built-in web dashboard (1 = enabled, 0 = disabled).",
+      "env_variable": "HERMES_DASHBOARD",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "text"
+    },
+    {
+      "name": "Dashboard Port",
+      "description": "Port for the web dashboard. Must match the dashboard allocation you assign to the server.",
+      "env_variable": "HERMES_DASHBOARD_PORT",
+      "default_value": "9119",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|between:1024,65535",
+      "field_type": "text"
+    },
+    {
+      "name": "Dashboard Insecure Mode",
+      "description": "Disable the OAuth auth gate (1 = yes, 0 = no). Only use this on private/trusted networks.",
+      "env_variable": "HERMES_DASHBOARD_INSECURE",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "text"
+    },
+    {
+      "name": "API Server Enabled",
+      "description": "Enable the OpenAI-compatible API server.",
+      "env_variable": "API_SERVER_ENABLED",
+      "default_value": "true",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "text"
+    },
+    {
+      "name": "API Server Host",
+      "description": "Host address for the API server. 0.0.0.0 exposes it externally.",
+      "env_variable": "API_SERVER_HOST",
+      "default_value": "0.0.0.0",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "s6-overlay Read-Only Root",
+      "description": "Tell s6-overlay that the container root filesystem is read-only. Required for Pelican/Pterodactyl environments.",
+      "env_variable": "S6_READ_ONLY_ROOT",
+      "default_value": "1",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|boolean",
+      "field_type": "text"
+    },
+    {
+      "name": "Additional Environment Variables",
+      "description": "Extra environment variables to pass to Hermes (format: KEY=VALUE KEY2=VALUE2).",
+      "env_variable": "EXTRA_ENV",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    }
+  ]
+}

@@ -15,33 +15,42 @@ LABEL org.opencontainers.image.authors="gelvey@neuronexus.xyz" \
 USER root
 RUN rm -rf /opt/data && ln -s /home/container /opt/data
 
-# Create the required Pelican container user with UID 999 (harmless if it already exists)
-RUN groupadd -g 999 container 2>/dev/null || true && \
-    useradd -u 999 -g 999 -m -d /home/container -s /bin/bash container 2>/dev/null || true
+# The Hermes image is designed to start as root, remap the hermes user, and then
+# drop privileges via s6-setuidgid. Pelican runs containers as UID 999, so the
+# image's root checks in stage2-hook.sh and main-wrapper.sh fail because
+# 999 != 0 and 999 != 10000 (the baked hermes UID). The fix: remap the hermes
+# user to UID 999 at build time so the runtime UID matches the hermes user.
+# Then the root checks pass naturally, and the scripts skip usermod/groupmod
+# because the desired UID is already in place.
+RUN old_uid=$(id -u hermes) && old_gid=$(id -g hermes) && \
+    usermod -o -u 999 hermes && \
+    groupmod -o -g 999 hermes && \
+    find /opt/hermes -user "$old_uid" -exec chown -h 999:999 {} + 2>/dev/null || true
+
+# Create the Pelican data directory and ensure it's owned by the runtime user.
+RUN mkdir -p /home/container && chown 999:999 /home/container
 
 # Fix s6-overlay permissions error when running as non-root user.
-# Pelican runs containers as the 'container' user, so s6-overlay preinit expects
-# /run to be owned by that user, not root.
+# Pelican runs containers as UID 999, so s6-overlay preinit expects /run to be
+# owned by the runtime user, not root.
 RUN chown -R 999:999 /run /var/run /tmp && chmod 777 /run /var/run /tmp
 
 # Tell s6-overlay to accept a root-owned /run directory when running as non-root.
-# This is a safety net for Pelican/Pterodactyl environments where the runtime user
-# may differ from the image build user.
 ENV S6_READ_ONLY_ROOT=1
 
 # Ensure /run and /tmp are writable at runtime. Pelican runs containers with a
 # read-only root filesystem, but Docker volumes remain writable. Declaring these
-# as volumes forces Docker to mount anonymous writable volumes over them, which
-# satisfies s6-overlay's requirement for a writable /run directory.
+# as volumes forces Docker to mount anonymous writable volumes over them.
 VOLUME ["/run", "/var/run", "/tmp"]
 
-# Set the default user and working directory as required by Pelican
-ENV USER=container HOME=/home/container
+# Use the hermes user (now UID 999) as the runtime user. The Hermes image's
+# init scripts and service run files expect the runtime user to be hermes.
+ENV USER=hermes HOME=/opt/data
 WORKDIR /home/container
-USER container
+USER hermes
 
 # Signal handling for graceful shutdown
-STOPSIGNAL SIGINT
+STOPSIGNAL SIGTERM
 
 # The Hermes image uses s6-overlay as its init system.
 # Our symlink is created at build time so the runtime container starts cleanly.
